@@ -1,0 +1,10 @@
+datasets
+praw
+pandas
+python-dotenv
+tqdm
+sentence-transformers 
+scikit-learn
+torch
+matplotlib
+seaborn
