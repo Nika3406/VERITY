@@ -1,5 +1,6 @@
 datasets
 praw
+psaw
 pandas
 python-dotenv
 tqdm
@@ -8,3 +9,7 @@ scikit-learn
 torch
 matplotlib
 seaborn
+accelerate
+tiktoken 
+protobuf
+sentencepiece

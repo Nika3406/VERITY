@@ -1,0 +1,29 @@
+Total subreddits discovered: 317
+Scanned: 50
+New found this run: 23
+Failed: 0
+
+Sample of new discoveries:
+  - r/BenShapiro
+  - r/CanadianConservative
+  - r/CatholicHumor
+  - r/ConservativeMemes
+  - r/CulturePreserveUK
+  - r/DailyWire
+  - r/ElectRonDeSantis
+  - r/ImmigrationReform
+  - r/MarkRLevin
+  - r/MetaAuspol
+  - r/Monarchism
+  - r/PornFree
+  - r/ProLife
+  - r/Tories
+  - r/Wild_Politics
+  - r/catholicism
+  - r/climateskeptics
+  - r/conservativecartoons
+  - r/judaism
+  - r/protestantism
+  - r/republican
+  - r/trumped
+  - r/tucker_carlson
