@@ -1,0 +1,16 @@
+{
+  "doubt": 0.1,
+  "loaded_language": 0.1,
+  "appeal_to_fear_prejudice": 0.1,
+  "appeal_to_authority": 0.9500000000000001,
+  "causal_oversimplification": 0.1,
+  "name_calling_labeling": 0.1,
+  "exaggeration_minimisation": 0.1,
+  "flag_waving": 0.1,
+  "whataboutism_straw_men_red_herring": 0.1,
+  "repetition": 0.1,
+  "black_and_white_fallacy": 0.1,
+  "bandwagon_reductio_ad_hitlerum": 0.35000000000000003,
+  "slogans": 0.35000000000000003,
+  "thought_terminating_cliches": 0.25
+}

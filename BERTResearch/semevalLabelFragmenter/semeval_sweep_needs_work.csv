@@ -1,0 +1,2 @@
+label,gold,best_thr,strategy,best_precision,best_recall,best_f1,pred_at_best
+appeal_to_authority,144,0.9500000000000001,peak,2.4969086868220596,77.24923754760003,4.8374573917585915,3427

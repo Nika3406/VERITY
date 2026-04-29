@@ -19,8 +19,7 @@ This project introduces a Reddit-only propaganda dataset and a BERT-based classi
 ## Benchmarks as Baselines
 While the model is trained only on Reddit, these benchmarks guide category definitions and bias framing:
 
-- **Propaganda Techniques Corpus (PTC):** 18 techniques from news.  
-- **MAFALDA Dataset:** Logical fallacies in text.  
+- **Propaganda Techniques Corpus (PTC):** 18 techniques from news.   
 
 ---
 

@@ -1,145 +1,322 @@
-import pandas as pd
-import numpy as np
+#!/usr/bin/env python3
+"""
+semeval_data_processor.py  (UNIFIED — replaces v1 and v2)
+
+Reads semeval_examples.csv (output of semeval_extract_with_gold.py)
+and produces semeval_processed.csv for training.
+
+Key design decisions
+---------------------
+1.  Canonical 14-label set only (matches gold.csv / SemEval-2020 Task 11).
+    No more 18-label messy mapping.
+
+2.  Soft (percentage) labels instead of binary 0/1.
+    Each label value = fraction of the text that is covered by that technique,
+    capped at 1.0.  This gives the model calibration signal — a snippet that is
+    entirely loaded language gets 1.0, one that is 80% loaded language gets 0.8.
+
+    During training, BCEWithLogitsLoss handles float targets in [0, 1] natively.
+    During evaluation, we still threshold at a per-label cutoff.
+
+3.  Deduplication by text, keeping the union of all technique labels across
+    duplicate snippets (same text may appear with different techniques).
+
+4.  Statistics report so you can see the label distribution before training.
+
+Usage
+-----
+    python semeval_data_processor.py
+
+Input:  semeval_examples.csv   (doc_id, label_raw, label, start, end, text_snippet)
+Output: semeval_processed.csv  (text, <14 label columns as floats 0.0–1.0>)
+"""
+
+from __future__ import annotations
+
+import sys
 from collections import defaultdict
+from pathlib import Path
 
-"""
-Process the SemEval propaganda dataset for multi-label classification training.
-"""
+import numpy as np
+import pandas as pd
 
-# ===================== LOAD SEMEVAL DATA =====================
-print("[INFO] Loading SemEval data...")
-df = pd.read_csv("semeval_examples.csv")
-
-print(f"[INFO] Loaded {len(df)} labeled examples")
-print(f"[INFO] Columns: {df.columns.tolist()}")
-
-# ===================== NORMALIZE LABELS =====================
-print("\n[INFO] Normalizing propaganda technique labels...")
-
-# Get all unique labels from the dataset
-all_labels = set()
-for label in df['label'].dropna():
-    # Split comma-separated labels
-    techniques = [t.strip() for t in str(label).split(',')]
-    all_labels.update(techniques)
-
-# Create normalized label mapping (remove spaces, lowercase, handle variations)
-label_mapping = {}
-STANDARD_LABELS = [
-    "loaded_language",
-    "name_calling",
-    "repetition",
-    "exaggeration",
-    "appeal_to_fear",
+# ===================== CANONICAL LABEL SET =====================
+# Must match gold.csv exactly — do not change order or spelling.
+SEMEVAL_14 = [
+    "appeal_to_authority",
+    "appeal_to_fear_prejudice",
+    "bandwagon_reductio_ad_hitlerum",
+    "black_and_white_fallacy",
     "causal_oversimplification",
     "doubt",
-    "appeal_to_authority",
+    "exaggeration_minimisation",
     "flag_waving",
-    "black_white_fallacy",
-    "thought_terminating_cliche",
-    "whataboutism",
-    "reductio_ad_hitlerum",
-    "red_herring",
-    "straw_man",
-    "bandwagon",
-    "obfuscation",
-    "slogans"
+    "loaded_language",
+    "name_calling_labeling",
+    "repetition",
+    "slogans",
+    "thought_terminating_cliches",
+    "whataboutism_straw_men_red_herring",
 ]
 
-# Map SemEval labels to our standard labels
-for label in all_labels:
-    normalized = label.lower().replace('-', '_').replace(' ', '_')
-    
-    # Handle specific mappings
-    if 'name_calling' in normalized or 'labeling' in normalized:
-        label_mapping[label] = 'name_calling'
-    elif 'exaggeration' in normalized or 'minimisation' in normalized:
-        label_mapping[label] = 'exaggeration'
-    elif 'appeal_to_fear' in normalized or 'prejudice' in normalized:
-        label_mapping[label] = 'appeal_to_fear'
-    elif 'black' in normalized and 'white' in normalized and 'fallacy' in normalized:
-        label_mapping[label] = 'black_white_fallacy'
-    elif 'thought' in normalized and 'terminating' in normalized:
-        label_mapping[label] = 'thought_terminating_cliche'
-    elif 'whataboutism' in normalized or 'straw' in normalized or 'red_herring' in normalized:
-        label_mapping[label] = 'whataboutism'
-    elif 'bandwagon' in normalized or 'reductio' in normalized or 'hitlerum' in normalized:
-        label_mapping[label] = 'bandwagon'
-    elif 'slogans' in normalized:
-        label_mapping[label] = 'slogans'
-    elif 'obfuscation' in normalized:
-        label_mapping[label] = 'obfuscation'
+# ===================== RAW → CANONICAL MAPPING =====================
+# Every raw SemEval label that has ever appeared in the dataset.
+# Maps to one of the 14 canonical labels above.
+RAW_TO_CANON: dict[str, str] = {
+    # --- exact SemEval-2020 raw strings ---
+    "Appeal_to_Authority":                    "appeal_to_authority",
+    "Appeal_to_fear-prejudice":               "appeal_to_fear_prejudice",
+    "Bandwagon,Reductio_ad_hitlerum":         "bandwagon_reductio_ad_hitlerum",
+    "Black-and-White_Fallacy":                "black_and_white_fallacy",
+    "Causal_Oversimplification":              "causal_oversimplification",
+    "Doubt":                                  "doubt",
+    "Exaggeration,Minimisation":              "exaggeration_minimisation",
+    "Flag-Waving":                            "flag_waving",
+    "Loaded_Language":                        "loaded_language",
+    "Name_Calling,Labeling":                  "name_calling_labeling",
+    "Repetition":                             "repetition",
+    "Slogans":                                "slogans",
+    "Thought-terminating_Cliches":            "thought_terminating_cliches",
+    "Whataboutism,Straw_Men,Red_Herring":     "whataboutism_straw_men_red_herring",
+    # --- common normalisation variants (in case semeval_extract.py produced them) ---
+    "appeal_to_authority":                    "appeal_to_authority",
+    "appeal_to_fear_prejudice":               "appeal_to_fear_prejudice",
+    "appeal_to_fear/prejudice":               "appeal_to_fear_prejudice",
+    "appeal_to_fear":                         "appeal_to_fear_prejudice",
+    "bandwagon_reductio_ad_hitlerum":         "bandwagon_reductio_ad_hitlerum",
+    "bandwagon":                              "bandwagon_reductio_ad_hitlerum",
+    "reductio_ad_hitlerum":                   "bandwagon_reductio_ad_hitlerum",
+    "black_and_white_fallacy":                "black_and_white_fallacy",
+    "black_white_fallacy":                    "black_and_white_fallacy",
+    "black-and-white_fallacy":                "black_and_white_fallacy",
+    "causal_oversimplification":              "causal_oversimplification",
+    "oversimplification":                     "causal_oversimplification",
+    "scapegoating":                           "causal_oversimplification",
+    "doubt":                                  "doubt",
+    "exaggeration_minimisation":              "exaggeration_minimisation",
+    "exaggeration":                           "exaggeration_minimisation",
+    "minimisation":                           "exaggeration_minimisation",
+    "minimization":                           "exaggeration_minimisation",
+    "flag_waving":                            "flag_waving",
+    "flag-waving":                            "flag_waving",
+    "loaded_language":                        "loaded_language",
+    "name_calling_labeling":                  "name_calling_labeling",
+    "name_calling":                           "name_calling_labeling",
+    "labeling":                               "name_calling_labeling",
+    "name_calling,labeling":                  "name_calling_labeling",
+    "repetition":                             "repetition",
+    "slogans":                                "slogans",
+    "slogan":                                 "slogans",
+    "thought_terminating_cliches":            "thought_terminating_cliches",
+    "thought_terminating_cliche":             "thought_terminating_cliches",
+    "thought-terminating_cliches":            "thought_terminating_cliches",
+    "whataboutism_straw_men_red_herring":     "whataboutism_straw_men_red_herring",
+    "whataboutism":                           "whataboutism_straw_men_red_herring",
+    "straw_man":                              "whataboutism_straw_men_red_herring",
+    "strawman":                               "whataboutism_straw_men_red_herring",
+    "red_herring":                            "whataboutism_straw_men_red_herring",
+    "red herring":                            "whataboutism_straw_men_red_herring",
+    "whataboutism,straw_men,red_herring":     "whataboutism_straw_men_red_herring",
+    # --- old semeval_data_processor.py outputs (v1 18-label space) ---
+    "appeal_to_fear":                         "appeal_to_fear_prejudice",
+    "black_white_fallacy":                    "black_and_white_fallacy",
+    "thought_terminating_cliche":             "thought_terminating_cliches",
+    "obfuscation":                            "loaded_language",   # nearest match
+    "slogans":                                "slogans",
+    "flag_waving":                            "flag_waving",
+}
+
+
+def _normalise_raw(label_raw: str) -> str | None:
+    """Return canonical label or None if unmappable."""
+    stripped = label_raw.strip()
+    if stripped in RAW_TO_CANON:
+        return RAW_TO_CANON[stripped]
+    # fallback: lowercase + replace punctuation
+    normalised = (
+        stripped.lower()
+        .replace("-", "_")
+        .replace(" ", "_")
+        .replace(",", "")
+        .replace("/", "_")
+    )
+    return RAW_TO_CANON.get(normalised, None)
+
+
+def _coverage(snippet: str, span_len: int) -> float:
+    """
+    Soft label: fraction of the snippet covered by one propaganda span.
+
+    Since semeval_examples.csv stores text_snippet = the extracted span itself
+    (not the full sentence), span_len == len(snippet) by construction, giving 1.0.
+
+    HOWEVER: if the same text appears multiple times with the same label,
+    we cap at 1.0 regardless of how many overlapping annotations exist.
+
+    For genuinely partial spans (future data with full-sentence context),
+    this will return the correct ratio < 1.0.
+    """
+    if len(snippet) == 0:
+        return 0.0
+    return min(1.0, span_len / len(snippet))
+
+
+# ===================== MAIN =====================
+
+INPUT_FILE  = "semeval_examples.csv"
+OUTPUT_FILE = "semeval_processed.csv"
+MIN_TEXT_LEN = 10
+
+
+def main() -> None:
+    print("=" * 70)
+    print("SEMEVAL DATA PROCESSOR  (unified, 14-label, soft labels)")
+    print("=" * 70)
+
+    # ---- Load ----
+    if not Path(INPUT_FILE).exists():
+        sys.exit(
+            f"[ERROR] {INPUT_FILE} not found.\n"
+            "Run semeval_extract_with_gold.py first:\n"
+            "  python semeval_extract_with_gold.py "
+            "--label_file semeval_datasets/train-task2-TC.labels "
+            "--articles_dir semeval_datasets/train-articles"
+        )
+
+    df = pd.read_csv(INPUT_FILE)
+    print(f"[INFO] Loaded {len(df):,} rows from {INPUT_FILE}")
+    print(f"[INFO] Columns: {df.columns.tolist()}")
+
+    # Detect text column
+    for cname in ["text_snippet", "text", "snippet"]:
+        if cname in df.columns:
+            text_col = cname
+            break
     else:
-        # Try to match to standard labels
-        for std_label in STANDARD_LABELS:
-            if std_label.replace('_', '') in normalized.replace('_', ''):
-                label_mapping[label] = std_label
-                break
-        else:
-            # Keep original normalized form if no match found
-            label_mapping[label] = normalized
+        sys.exit(f"[ERROR] No text column found. Available: {df.columns.tolist()}")
 
-print(f"[INFO] Found {len(all_labels)} unique label types")
-print(f"[INFO] Mapped to {len(set(label_mapping.values()))} standard labels")
+    # Detect label column
+    for cname in ["label", "label_raw"]:
+        if cname in df.columns:
+            label_col = cname
+            break
+    else:
+        sys.exit(f"[ERROR] No label column found. Available: {df.columns.tolist()}")
 
-# ===================== CREATE MULTI-HOT ENCODED DATASET =====================
-print("\n[INFO] Creating multi-hot encoded dataset...")
+    print(f"[INFO] Using text column='{text_col}', label column='{label_col}'")
 
-# Get final set of labels
-final_labels = sorted(set(label_mapping.values()))
-print(f"[INFO] Final label set ({len(final_labels)} labels):")
-for label in final_labels:
-    print(f"  - {label}")
+    # ---- Normalise labels ----
+    df["_canon"] = df[label_col].apply(_normalise_raw)
 
-# Group by text_snippet and aggregate labels
-text_to_labels = defaultdict(set)
-for _, row in df.iterrows():
-    text = str(row['text_snippet']).strip()
-    if not text or len(text) < 10:
-        continue
-    
-    label_str = str(row['label'])
-    if pd.isna(label_str) or label_str == 'nan':
-        continue
-    
-    # Split comma-separated labels
-    techniques = [t.strip() for t in label_str.split(',')]
-    
-    # Map to standard labels
-    for technique in techniques:
-        if technique in label_mapping:
-            standard_label = label_mapping[technique]
-            text_to_labels[text].add(standard_label)
+    unknown = df[df["_canon"].isna()][label_col].unique()
+    if len(unknown):
+        print(f"[WARNING] {len(unknown)} unmappable label(s) — will be skipped:")
+        for u in sorted(unknown):
+            print(f"  '{u}'")
 
-# Create final dataframe
-data_rows = []
-for text, labels in text_to_labels.items():
-    row = {'text': text}
-    # Create multi-hot encoding
-    for label in final_labels:
-        row[label] = 1 if label in labels else 0
-    data_rows.append(row)
+    df = df[df["_canon"].notna()].copy()
+    print(f"[INFO] {len(df):,} rows after dropping unmappable labels")
 
-df_processed = pd.DataFrame(data_rows)
+    # ---- Clean text ----
+    df["_text"] = df[text_col].astype(str).str.replace(r"\s+", " ", regex=True).str.strip()
+    df = df[df["_text"].str.len() >= MIN_TEXT_LEN].copy()
 
-print(f"\n[INFO] Processed {len(df_processed)} unique text samples")
+    # ---- Compute soft label per (text, technique) ----
+    # For each row: coverage = len(span) / len(snippet)
+    # Since text_snippet IS the span, this is almost always 1.0.
+    # We keep the formula here so it generalises to future full-sentence data.
+    if "start" in df.columns and "end" in df.columns:
+        df["_span_len"] = (df["end"] - df["start"]).clip(lower=0)
+    else:
+        # No offsets available — assume full coverage
+        df["_span_len"] = df["_text"].str.len()
 
-# ===================== STATISTICS =====================
-print("\n[INFO] Label distribution:")
-for label in final_labels:
-    count = df_processed[label].sum()
-    pct = 100 * count / len(df_processed)
-    print(f"  {label:.<40} {int(count):>6} ({pct:>5.1f}%)")
+    df["_coverage"] = df.apply(
+        lambda r: _coverage(r["_text"], r["_span_len"]), axis=1
+    )
 
-avg_labels = df_processed[final_labels].sum(axis=1).mean()
-print(f"\n[INFO] Average labels per sample: {avg_labels:.2f}")
+    # ---- Aggregate: one row per unique text ----
+    # For each text, take the MAX coverage per label across all its spans.
+    # (Multiple overlapping spans of the same technique → cap at 1.0)
+    text_label_max: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
 
-# ===================== SAVE PROCESSED DATA =====================
-output_file = "semeval_processed.csv"
-df_processed.to_csv(output_file, index=False)
-print(f"\n[SUCCESS] Saved processed data to {output_file}")
+    for _, row in df.iterrows():
+        text  = row["_text"]
+        label = row["_canon"]
+        cov   = row["_coverage"]
+        text_label_max[text][label] = max(text_label_max[text][label], cov)
 
-print("\n[NEXT STEPS]")
-print("1. This processed file is ready for training")
-print("2. Run the updated training script with this data")
-print("3. The Reddit data will be semantically labeled based on these examples")
+    # ---- Build output DataFrame ----
+    rows = []
+    for text, label_vals in text_label_max.items():
+        row: dict = {"text": text}
+        for lab in SEMEVAL_14:
+            row[lab] = round(label_vals.get(lab, 0.0), 4)
+        rows.append(row)
+
+    df_out = pd.DataFrame(rows)
+
+    # ---- Drop rows where all labels are zero (shouldn't happen, safety net) ----
+    label_sum = df_out[SEMEVAL_14].sum(axis=1)
+    n_zero = (label_sum == 0).sum()
+    if n_zero:
+        print(f"[WARNING] Dropping {n_zero} rows with all-zero labels")
+        df_out = df_out[label_sum > 0]
+
+    df_out = df_out.reset_index(drop=True)
+
+    # ---- Save ----
+    df_out.to_csv(OUTPUT_FILE, index=False, encoding="utf-8")
+    print(f"\n[SUCCESS] Saved {len(df_out):,} samples → {OUTPUT_FILE}")
+
+    # ---- Statistics ----
+    print("\n" + "=" * 70)
+    print("LABEL DISTRIBUTION")
+    print("=" * 70)
+    print(f"\n{'Label':<45} {'N>0':>6} {'% rows':>8} {'Mean':>8} {'Max':>6}")
+    print("-" * 75)
+
+    for lab in SEMEVAL_14:
+        col        = df_out[lab]
+        n_nonzero  = (col > 0).sum()
+        pct        = 100 * n_nonzero / len(df_out)
+        mean_val   = col[col > 0].mean() if n_nonzero else 0.0
+        max_val    = col.max()
+        flag       = " ⚠  LOW" if n_nonzero < 30 else ""
+        print(f"  {lab:<43} {n_nonzero:>6} {pct:>7.1f}% {mean_val:>8.3f} {max_val:>6.3f}{flag}")
+
+    avg_active = (df_out[SEMEVAL_14] > 0).sum(axis=1).mean()
+    print(f"\n  Average active labels per sample : {avg_active:.2f}")
+    print(f"  Total samples                    : {len(df_out):,}")
+
+    # ---- Soft vs hard comparison ----
+    binary_sum   = (df_out[SEMEVAL_14] > 0).sum().sum()
+    soft_sum     = df_out[SEMEVAL_14].sum().sum()
+    print(f"\n  Binary label mass  (count of 1s) : {binary_sum:,}")
+    print(f"  Soft   label mass  (sum of vals) : {soft_sum:.1f}")
+    print(f"  Ratio (soft/binary)              : {soft_sum/binary_sum:.3f}")
+    print(
+        "\n  A ratio near 1.0 means most spans are full-coverage (expected).\n"
+        "  When you add full-sentence context later, this ratio will drop\n"
+        "  below 1.0 and the soft labels will carry more signal.\n"
+    )
+
+    print("=" * 70)
+    print("NEXT STEPS")
+    print("=" * 70)
+    print(f"  1.  Train   : python debertaL_v2.py --phase finetune")
+    print(f"  2.  Export  : python export_pred_sentence_fragments.py \\")
+    print(f"                  --input_texts semeval_input_texts.csv \\")
+    print(f"                  --model_dir   ./deberta-propaganda-multilabel \\")
+    print(f"                  --write_pred")
+    print(f"  3.  Sweep   : python threshold_sweep_semeval.py \\")
+    print(f"                  --gold gold.csv --sentence_probs sentence_probs.csv")
+    print(f"  4.  Eval    : python threshold_optimizer.py \\")
+    print(f"                  --model_dir ./deberta-propaganda-multilabel \\")
+    print(f"                  --gold gold.csv --sentence_probs sentence_probs.csv")
+    print(f"  5.  Score   : python propaganda_fragment_eval.py \\")
+    print(f"                  --gold gold.csv --pred pred.csv")
+
+
+if __name__ == "__main__":
+    main()

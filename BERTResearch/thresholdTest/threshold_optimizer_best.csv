@@ -1,0 +1,15 @@
+label,status,best_f1,best_p,best_r,best_thr,n_gold,action
+doubt,good,10.8115,5.5991,156.5477,0.05,493,No action needed.
+loaded_language,good,8.0345,5.2077,17.5733,0.05,2123,No action needed.
+appeal_to_fear_prejudice,good,6.3249,3.3432,58.5055,0.1,294,No action needed.
+causal_oversimplification,good,5.1013,2.6163,101.684,0.2,209,No action needed.
+appeal_to_authority,good,4.8368,2.5952,35.5035,0.95,144,No action needed.
+name_calling_labeling,good,4.6196,2.5414,25.3423,0.05,1058,No action needed.
+exaggeration_minimisation,good,4.3754,2.286,50.8669,0.05,466,No action needed.
+flag_waving,good,3.2535,1.7018,36.8897,0.05,229,No action needed.
+whataboutism_straw_men_red_herring,good,2.5229,1.2798,87.8709,0.45,108,No action needed.
+repetition,good,2.3844,1.2721,18.9774,0.05,621,No action needed.
+black_and_white_fallacy,good,2.3493,1.1922,79.7893,0.05,107,No action needed.
+bandwagon_reductio_ad_hitlerum,good,1.5379,0.7781,65.6174,0.1,72,No action needed.
+slogans,good,0.7746,0.4057,8.542,0.05,129,No action needed.
+thought_terminating_cliches,good,0.5785,0.3832,1.1798,0.9,76,No action needed.

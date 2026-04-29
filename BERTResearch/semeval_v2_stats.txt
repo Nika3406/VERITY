@@ -1,0 +1,94 @@
+SEMEVAL V2 PROCESSING STATISTICS
+================================================================================
+
+Input file: semeval_examples.csv
+Output file: semeval_processed_v2.csv
+Method: character
+Total samples: 4904
+Average labels per sample: 1.02
+
+Per-label statistics:
+
+appeal_to_authority:
+  Samples: 144
+  Avg %: 100.00%
+  Max %: 100.00%
+  Min %: 100.00%
+
+appeal_to_fear_prejudice:
+  Samples: 284
+  Avg %: 100.00%
+  Max %: 100.00%
+  Min %: 100.00%
+
+bandwagon_reductio_ad_hitlerum:
+  Samples: 71
+  Avg %: 100.00%
+  Max %: 100.00%
+  Min %: 100.00%
+
+black_and_white_fallacy:
+  Samples: 104
+  Avg %: 100.00%
+  Max %: 100.00%
+  Min %: 100.00%
+
+causal_oversimplification:
+  Samples: 207
+  Avg %: 100.00%
+  Max %: 100.00%
+  Min %: 100.00%
+
+doubt:
+  Samples: 485
+  Avg %: 100.00%
+  Max %: 100.00%
+  Min %: 100.00%
+
+exaggeration_minimisation:
+  Samples: 420
+  Avg %: 100.00%
+  Max %: 100.00%
+  Min %: 100.00%
+
+flag_waving:
+  Samples: 189
+  Avg %: 100.00%
+  Max %: 100.00%
+  Min %: 100.00%
+
+loaded_language:
+  Samples: 1622
+  Avg %: 100.00%
+  Max %: 100.00%
+  Min %: 100.00%
+
+name_calling_labeling:
+  Samples: 894
+  Avg %: 100.00%
+  Max %: 100.00%
+  Min %: 100.00%
+
+repetition:
+  Samples: 292
+  Avg %: 100.00%
+  Max %: 100.00%
+  Min %: 100.00%
+
+slogans:
+  Samples: 108
+  Avg %: 100.00%
+  Max %: 100.00%
+  Min %: 100.00%
+
+thought_terminating_cliches:
+  Samples: 71
+  Avg %: 100.00%
+  Max %: 100.00%
+  Min %: 100.00%
+
+whataboutism_straw_men_red_herring:
+  Samples: 100
+  Avg %: 100.00%
+  Max %: 100.00%
+  Min %: 100.00%

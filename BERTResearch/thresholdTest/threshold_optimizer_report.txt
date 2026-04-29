@@ -1,0 +1,41 @@
+======================================================================
+DEBERTA PROPAGANDA MODEL — DIAGNOSTIC REPORT
+======================================================================
+
+Gold file       : ../gold.csv
+Probs file      : ../sentence_probs.csv
+Threshold range : 0.05 – 0.95  step=0.05
+
+OVERALL SCORES
+----------------------------------------
+  Macro F1 (over evaluated labels)    : 4.1075
+  Weighted F1 (by gold count)         : 5.8640
+
+STATUS BREAKDOWN
+----------------------------------------
+  good                  : 14
+
+PER-LABEL RESULTS
+----------------------------------------
+Label                                             F1      P      R   thr   gold  Status / Action
+-------------------------------------------------------------------------------------------------------------------
+  doubt                                       10.812  5.599 156.548  0.05    493  [good]  No action needed.
+  loaded_language                              8.034  5.208 17.573  0.05   2123  [good]  No action needed.
+  appeal_to_fear_prejudice                     6.325  3.343 58.505  0.10    294  [good]  No action needed.
+  causal_oversimplification                    5.101  2.616 101.684  0.20    209  [good]  No action needed.
+  appeal_to_authority                          4.837  2.595 35.504  0.95    144  [good]  No action needed.
+  name_calling_labeling                        4.620  2.541 25.342  0.05   1058  [good]  No action needed.
+  exaggeration_minimisation                    4.375  2.286 50.867  0.05    466  [good]  No action needed.
+  flag_waving                                  3.253  1.702 36.890  0.05    229  [good]  No action needed.
+  whataboutism_straw_men_red_herring           2.523  1.280 87.871  0.45    108  [good]  No action needed.
+  repetition                                   2.384  1.272 18.977  0.05    621  [good]  No action needed.
+  black_and_white_fallacy                      2.349  1.192 79.789  0.05    107  [good]  No action needed.
+  bandwagon_reductio_ad_hitlerum               1.538  0.778 65.617  0.10     72  [good]  No action needed.
+  slogans                                      0.775  0.406  8.542  0.05    129  [good]  No action needed.
+  thought_terminating_cliches                  0.579  0.383  1.180  0.90     76  [good]  No action needed.
+
+LABELS NEEDING ATTENTION
+----------------------------------------
+  None — all evaluated labels are in good shape!
+
+======================================================================

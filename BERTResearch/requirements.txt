@@ -13,3 +13,4 @@ accelerate
 tiktoken 
 protobuf
 sentencepiece
+spacy
