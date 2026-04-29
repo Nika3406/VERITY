@@ -496,32 +496,6 @@ The final tool can be extended to highlight the exact phrase or sentence fragmen
 
 ---
 
-## Project Status
-
-This project currently includes:
-
-- Reddit scraping tools
-- SemEval processing tools
-- Active learning candidate selection
-- LLM ensemble labeling
-- DeBERTa-v3-large training
-- RoRA adapter fine-tuning
-- Prediction script
-- Fragment-level evaluation tools
-- Threshold optimization scripts
-
-The project is suitable for a research portfolio, academic presentation, or continued development into a usable propaganda analysis tool.
-
----
-
-## Author
-
-**Nicholas Shvelidze**  
-Computer Science Student  
-Penn State University
-
----
-
 ## Acknowledgments
 
 This project is inspired by prior work on fine-grained propaganda detection, especially SemEval-2020 Task 11 and the Propaganda Techniques Corpus. It extends those ideas into Reddit-style informal political discourse using active learning, LLM-assisted labeling, and transformer-based classification.
